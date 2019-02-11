@@ -1,9 +1,9 @@
-import pandas as pd 
-import re
-import numpy as np
-import string
+import pandas as pd
 from pandas import DataFrame
-from sklearn.feature_extraction.text import CountVectorizer
+from nltk.corpus import stopwords
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn import naive_bayes
+from sklearn.metrics import roc_auc_score
 
 # function to create dataframes for text and sentiment
 def sentimentDataFrame(filename):
@@ -34,13 +34,14 @@ def sentimentDataFrame(filename):
         # score of the the text turned into pos/neg
         score = int(line[-4])
         # get the text 
-        review = line[index + 1:-7]
-        reviews.append(review)
-        
-        if score >= 3:
-            sentiments.append(1.0)
-        else:
-            sentiments.append(0.0)
+        if score != 3:
+            review = line[index + 1:-7]
+            reviews.append(review)
+            
+            if score >= 4:
+                sentiments.append(1)
+            else:
+                sentiments.append(0)
             
     # creating DataFrame out of text and sentiment
     df = DataFrame({'reviews':reviews, 'sentiments':sentiments})
@@ -48,45 +49,35 @@ def sentimentDataFrame(filename):
 
 
 def main():
+    
+    
+    # TFIDF Vectorizer - used to convert reviews from text to features
+    stopset = set(stopwords.words('english'))
+    vectorizer = TfidfVectorizer(use_idf=True, lowercase=True,
+                                strip_accents='ascii', stop_words=stopset)
 
     # dataframes for train and test dataset
     train_df = sentimentDataFrame("lab_train.txt")
-    X_train, y_train = train_df['reviews'].values, train_df['sentiments'].values
-    
+    X_train, y_train = vectorizer.fit_transform(train_df.reviews), train_df.sentiments
     
     test_df = sentimentDataFrame("lab_test.txt")
-    X_test, y_test = test_df['reviews'].values, test_df['sentiments'].values
+    X_test, y_test = vectorizer.transform(test_df.reviews), test_df.sentiments
+    
+    # train using naive bayes classifier
+    clf = naive_bayes.MultinomialNB()
+    clf.fit(X_train, y_train)
+    
+    # test models accuracy
+    print (roc_auc_score(y_test, clf.predict_proba(X_test)[:,1]))
+    
+    # import bookings.com comments
+    comments_df = pd.read_excel("evaluation_dataset.xlsx", header=None, names=['reviews'])
+    comments_vector = vectorizer.transform(comments_df['reviews'])
+    comments_df['sentiments'] = clf.predict(comments_vector)
+    print (comments_df)
     
     
-    # vectorizer for the strings
-    re_tok = re.compile(f'([{string.punctuation}“”¨«»®´·º½¾¿¡§£₤‘’])')
-    def tokenize(s):
-       return re_tok.sub(r' \1 ', s).split()
-    
-    # create bag of words 
-    vect = CountVectorizer(tokenizer=tokenize)
-    tf_train = vect.fit_transform(X_train)
-    tf_test = vect.transform(X_test)
-    
-    # Multinomial Bayes Classifier formula
-    
-    # p = sum of all feature count vectors with label 1
-    p = tf_train[y_train==1].sum(0) + 1
-    # q = sum of all feature count vectors with label 0
-    q = tf_train[y_train==0].sum(0) + 1
-    # log-count ratio r
-    r = np.log((p/p.sum()) / (q/q.sum()))
-    # ratio of number of positive and negative training cases.
-    b = np.log(len(p) / len(q))
-    
-    # generate predictions on test set
-    pre_preds = tf_test @ r.T + b
-    preds = pre_preds.T > 0
-    accuracy = (preds == y_test).mean()
-    
-    print (accuracy)
-
-
+      
 if __name__ == "__main__":
     main()
 
