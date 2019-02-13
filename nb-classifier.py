@@ -1,4 +1,5 @@
 import pandas as pd
+import numpy as np
 from pandas import DataFrame
 from nltk.corpus import stopwords
 from sklearn.feature_extraction.text import TfidfVectorizer
@@ -51,33 +52,48 @@ def sentimentDataFrame(filename):
 def main():
     
     
+    
     # TFIDF Vectorizer - used to convert reviews from text to features
     stopset = set(stopwords.words('english'))
     vectorizer = TfidfVectorizer(use_idf=True, lowercase=True,
                                 strip_accents='ascii', stop_words=stopset)
-
-    # dataframes for train and test dataset
-    train_df = sentimentDataFrame("lab_train.txt")
-    X_train, y_train = vectorizer.fit_transform(train_df.reviews), train_df.sentiments
     
-    test_df = sentimentDataFrame("lab_test.txt")
-    X_test, y_test = vectorizer.transform(test_df.reviews), test_df.sentiments
-    
-    # train using naive bayes classifier
     clf = naive_bayes.MultinomialNB()
-    clf.fit(X_train, y_train)
     
-    # test models accuracy
-    print (roc_auc_score(y_test, clf.predict_proba(X_test)[:,1]))
+    for i in range (100): 
+
+        # dataframes for train and test dataset
+        train_df = sentimentDataFrame("lab_train.txt")
+        X_train, y_train = vectorizer.fit_transform(train_df.reviews), train_df.sentiments
+        
+        test_df = sentimentDataFrame("lab_test.txt")
+        X_test, y_test = vectorizer.transform(test_df.reviews), test_df.sentiments
+        
+        # train using naive bayes classifier
+        
+        clf.fit(X_train, y_train)
+        
+        # test models accuracy
+        print (roc_auc_score(y_test, clf.predict_proba(X_test)[:,1]))
     
     # import bookings.com comments
     comments_df = pd.read_excel("evaluation_dataset.xlsx", header=None, names=['reviews'])
-    comments_vector = vectorizer.transform(comments_df['reviews'])
+    
+    
+    
+    comments_vector = vectorizer.transform(comments_df['reviews'].tolist())
     comments_df['sentiments'] = clf.predict(comments_vector)
-    print (comments_df)
     
     
-      
+    foo_arr = np.array(['worst place in the world, really bad, it sucks, horrible service, never coming again']) # comments_df['reviews'].tolist()
+    foo_vect = vectorizer.transform(foo_arr)
+    print (clf.predict(foo_vect))
+    
+    
+    
+    print (comments_df.loc[92])
+    
+        
 if __name__ == "__main__":
     main()
 
